@@ -88,12 +88,17 @@ public class DbTool {
     }
 
     public void insertVersion() throws SQLException{
+        this.insertVersion(initialVersion);
+    }
+
+    public void insertVersion(String version)throws SQLException {
         String initVersionSql = "INSERT INTO UPDATER_VERISON (VERSION,UPDATE_TIME) VALUES(?,?)";
-        this.executeUpdate(initVersionSql,initialVersion,new Timestamp(System.currentTimeMillis()));
+        this.executeUpdate(initVersionSql,version,new Timestamp(System.currentTimeMillis()));
     }
 
     public void updateVersion(String version) throws SQLException{
-        String updatesql = "UPDATE UPDATER_VERISON SET VERSION = ?";
-        this.executeUpdate(updatesql,version);
+        String delql = "DELETE FROM UPDATER_VERISON";
+        this.executeUpdate(delql);
+        this.insertVersion(version);
     }
 }

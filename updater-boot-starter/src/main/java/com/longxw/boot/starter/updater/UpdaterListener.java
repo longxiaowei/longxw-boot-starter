@@ -57,6 +57,7 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
             for(String key : map.keySet()){
                 String[] sqls = map.get(key).split(";");
                 for(String sql : sqls){
+                    log.info("executor sql:{}",sql);
                     dbTool.executeUpdate(sql);
                     lastVersion = key;
                 }
@@ -92,23 +93,30 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
             }
         }
         File sqlDir = new File(url.getPath()).getCanonicalFile();
+        //获取该目录下所有文件和目录的绝对路径
         File[] files = sqlDir.listFiles();
+
+        //找出符合的版本号的文件夹目录
         List<File> fileList = Arrays.stream(files)
+                .filter(file -> file.isDirectory())
                 .filter(file -> compareVersion(file.getName(),version)>0 )
                 .collect(Collectors.toList());
         Map<String,String> map = new TreeMap();
         fileList.forEach( file -> {
             StringBuffer sb =new StringBuffer();
-            try{
-                FileTool.readLines(file).forEach(line -> {
-                    if( !line.startsWith("#")){
-                        sb.append(line);
-                    }
-                });
-                map.put(file.getName(),sb.toString());
-            }catch (IOException e){
-                e.printStackTrace();
-            }
+            Arrays.stream(file.listFiles()).forEach(sqlFile -> {
+                try {
+                    FileTool.readLines(sqlFile).forEach(line -> {
+                        if( !line.startsWith("#")){
+                            sb.append(line);
+                        }
+                    });
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+
+            });
+            map.put(file.getName(),sb.toString());
 
         });
         return map;
