@@ -1,6 +1,7 @@
 package com.longxw.boot.starter.updater;
 import com.longxw.boot.starter.updater.tool.DbTool;
 import com.longxw.boot.starter.updater.tool.FileTool;
+import com.longxw.boot.starter.updater.tool.IOTool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -11,16 +12,14 @@ import org.springframework.util.ResourceUtils;
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.JarURLConnection;
 import java.net.URL;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,17 +46,16 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
         DbTool dbTool = new DbTool(connection);
         String version = dbTool.getCurrentVersion();
         if(version == null){
-            dbTool.insertVersion();//先插入一个默认
-            version = dbTool.getInitialVersion();
+            version = "0";
         }
 
         Map<String,String> map = getScript(version);
         if(!map.isEmpty()){
             String lastVersion = null;
             for(String key : map.keySet()){
-                String[] sqls = map.get(key).split(";");
+                String[] sqls = map.get(key).trim().split(";");
                 for(String sql : sqls){
-                    log.info("executor sql:{}",sql);
+                    log.info("executor sql:{},version:{}",sql,key);
                     dbTool.executeUpdate(sql);
                     lastVersion = key;
                 }
@@ -77,49 +75,83 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
     private Map<String,String> getScript(String version) throws IOException{
         URL url = ResourceUtils.getURL(defaultPath);
         if(ResourceUtils.isJarURL(url)){
+            log.info("read jar files");
             Enumeration<JarEntry> entries = ((JarURLConnection) url.openConnection()).getJarFile().entries();
             if(entries != null){
-                String sqlPath = defaultPath.split(":")[0];
-                List<String> list = new ArrayList<>();
+                String sqlPath = defaultPath.split(":")[1];
+                Map<String,String> map = new HashMap<>();
                 while (entries.hasMoreElements()){
                     JarEntry entry = entries.nextElement();
                     if(entry.getName().startsWith(sqlPath)){
                         int index = entry.getName().lastIndexOf(".sql");
                         if(index>0){
-                            list.add(entry.getName());
+                            String[] arr = entry.getName().split("/");
+                            int versionIndex = arr.length-2;
+                            String sqlVersion = arr[versionIndex];
+                            if(compareVersion(sqlVersion,version)>0){
+                                log.info("jar file:{}",entry.getName());
+                                String value = map.get(sqlVersion);
+                                if(value == null || "".equals(value)){
+                                    value = entry.getName();
+                                }else{
+                                    value = ","+entry.getName();
+                                }
+                                map.put(sqlVersion,value);
+                            }
                         }
                     }
                 }
-            }
-        }
-        File sqlDir = new File(url.getPath()).getCanonicalFile();
-        //获取该目录下所有文件和目录的绝对路径
-        File[] files = sqlDir.listFiles();
+                if(map.size() == 0){
+                    return map;
+                }else{
+                    Map<String,String> result = new HashMap<>();
+                    map.forEach((k,v)->{
+                        StringBuilder sb = new StringBuilder();
+                       Arrays.asList(v.split(",")).stream().forEach( string -> {
+                           log.info("read file:{}",string);
+                           try (InputStream is =  this.getClass().getClassLoader().getResourceAsStream(string)){
+                               sb.append(IOTool.readToString(is));
+                           }catch (Exception e){
 
-        //找出符合的版本号的文件夹目录
-        List<File> fileList = Arrays.stream(files)
-                .filter(file -> file.isDirectory())
-                .filter(file -> compareVersion(file.getName(),version)>0 )
-                .collect(Collectors.toList());
-        Map<String,String> map = new TreeMap();
-        fileList.forEach( file -> {
-            StringBuffer sb =new StringBuffer();
-            Arrays.stream(file.listFiles()).forEach(sqlFile -> {
-                try {
-                    FileTool.readLines(sqlFile).forEach(line -> {
-                        if( !line.startsWith("#")){
-                            sb.append(line);
-                        }
+                           }
+                       });
+                        result.put(k,sb.toString());
                     });
-                }catch (Exception e){
-                    e.printStackTrace();
+                    return result;
                 }
+            }else{
+                return new HashMap<>();
+            }
+        }else{
+            File sqlDir = new File(url.getPath()).getCanonicalFile();
+            //获取该目录下所有文件和目录的绝对路径
+            File[] files = sqlDir.listFiles();
+
+            //找出符合的版本号的文件夹目录
+            List<File> fileList = Arrays.stream(files)
+                    .filter(file -> file.isDirectory())
+                    .filter(file -> compareVersion(file.getName(),version)>0 )
+                    .collect(Collectors.toList());
+            Map<String,String> map = new TreeMap();
+            fileList.forEach( file -> {
+                StringBuffer sb =new StringBuffer();
+                Arrays.stream(file.listFiles()).forEach(sqlFile -> {
+                    try {
+                        FileTool.readLines(sqlFile).forEach(line -> {
+                            if( !line.startsWith("#")){
+                                sb.append(line);
+                            }
+                        });
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+
+                });
+                map.put(file.getName(),sb.toString());
 
             });
-            map.put(file.getName(),sb.toString());
-
-        });
-        return map;
+            return map;
+        }
     }
 
     private Connection getConnection(ApplicationContext applicationContext) throws SQLException{

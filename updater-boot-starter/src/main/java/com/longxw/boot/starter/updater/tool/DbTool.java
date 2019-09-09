@@ -6,21 +6,13 @@ public class DbTool {
 
     private Connection connection;
 
-    String tableName = "UPDATER_VERISON";
-
-    private String initialVersion = "1.0.0";
-
-    public String getInitialVersion() {
-        return initialVersion;
-    }
-
-    String initTableSql = "CREATE TABLE IF NOT EXISTS " +tableName +
+    String initTableSql = "CREATE TABLE IF NOT EXISTS UPDATER_VERISON" +
             "(  VERSION varchar(255)," +
             "  UPDATE_TIME datetime DEFAULT NULL," +
             "  PRIMARY KEY (VERSION)" +
             ")";
 
-    String selectVersionSql = "SELECT VERSION FROM "+tableName;
+    String selectVersionSql = "SELECT VERSION FROM UPDATER_VERISON";
 
     public DbTool(Connection connection){
         this.connection = connection;
@@ -79,17 +71,14 @@ public class DbTool {
     }
 
     public String getCurrentVersion() throws SQLException{
-        this.initVersion();
+        this.initTable();
         return (String)this.queryObject(selectVersionSql);
     }
 
-    private void initVersion() throws SQLException{
+    private void initTable() throws SQLException{
         this.executeUpdate(initTableSql);
     }
 
-    public void insertVersion() throws SQLException{
-        this.insertVersion(initialVersion);
-    }
 
     public void insertVersion(String version)throws SQLException {
         String initVersionSql = "INSERT INTO UPDATER_VERISON (VERSION,UPDATE_TIME) VALUES(?,?)";
