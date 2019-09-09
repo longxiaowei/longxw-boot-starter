@@ -14,8 +14,8 @@ public class DbTool {
         return initialVersion;
     }
 
-    String initTableSql = "CREATE TABLE IF NOT EXISTS {} ( "+tableName +
-            "  VERSION varchar(255) DEFAULT NULL," +
+    String initTableSql = "CREATE TABLE IF NOT EXISTS " +tableName +
+            "(  VERSION varchar(255)," +
             "  UPDATE_TIME datetime DEFAULT NULL," +
             "  PRIMARY KEY (VERSION)" +
             ")";
@@ -26,32 +26,48 @@ public class DbTool {
         this.connection = connection;
     }
 
-    public ResultSet executeQuery(String sql) throws SQLException {
-        PreparedStatement statement = this.connection.prepareStatement(sql);
-        ResultSet resultSet = statement.executeQuery();
-        statement.close();
-        return resultSet;
+    /**获取第一行第一列数据
+     * @author longxw
+     * @since 2019-9-9
+     */
+    public Object queryObject(String sql) throws SQLException {
+        try(PreparedStatement statement = this.connection.prepareStatement(sql)){
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next() && resultSet.getMetaData().getColumnCount() > 0){
+                return resultSet.getObject(1);
+            } else {
+                return null;
+            }
+        }
     }
 
-    public ResultSet executeQuery(String sql,Object... args) throws SQLException {
-        PreparedStatement statement = this.connection.prepareStatement(sql);
-        this.bindArgs(statement, args);
-        ResultSet resultSet = statement.executeQuery();
-        statement.close();
-        return resultSet;
+    /**获取第一行第一列数据
+     * @author longxw
+     * @since 2019-9-9
+     */
+    public Object queryObject(String sql,Object... args) throws SQLException {
+        try (PreparedStatement statement = this.connection.prepareStatement(sql)){
+            this.bindArgs(statement, args);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next() && resultSet.getMetaData().getColumnCount() > 0){
+                return resultSet.getObject(1);
+            } else {
+                return null;
+            }
+        }
     }
 
     public void executeUpdate(String sql) throws SQLException {
-        PreparedStatement statement = this.connection.prepareStatement(sql);
-        statement.executeUpdate();
-        statement.close();
+        try(PreparedStatement statement = this.connection.prepareStatement(sql)){
+            statement.executeUpdate();
+        }
     }
 
     public void executeUpdate(String sql, Object... args) throws SQLException {
-        PreparedStatement statement = connection.prepareStatement(sql);
-        this.bindArgs(statement, args);
-        statement.executeUpdate();
-        statement.close();
+        try (PreparedStatement statement = connection.prepareStatement(sql);){
+            this.bindArgs(statement, args);
+            statement.executeUpdate();
+        }
     }
 
     private void bindArgs(PreparedStatement statement, Object[] args) throws SQLException {
@@ -64,12 +80,7 @@ public class DbTool {
 
     public String getCurrentVersion() throws SQLException{
         this.initVersion();
-        ResultSet resultSet = this.executeQuery(selectVersionSql);
-        if (resultSet.next() && resultSet.getMetaData().getColumnCount() > 0){
-            return (String)resultSet.getObject(1);
-        } else {
-            return null;
-        }
+        return (String)this.queryObject(selectVersionSql);
     }
 
     private void initVersion() throws SQLException{

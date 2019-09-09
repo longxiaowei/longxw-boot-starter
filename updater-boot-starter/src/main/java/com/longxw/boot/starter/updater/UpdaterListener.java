@@ -52,15 +52,17 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
         }
 
         Map<String,String> map = getScript(version);
-        String lastVersion = null;
-        for(String key : map.keySet()){
-            String[] sqls = map.get(key).split(";");
-            for(String sql : sqls){
-                dbTool.executeUpdate(sql);
-                lastVersion = key;
+        if(!map.isEmpty()){
+            String lastVersion = null;
+            for(String key : map.keySet()){
+                String[] sqls = map.get(key).split(";");
+                for(String sql : sqls){
+                    dbTool.executeUpdate(sql);
+                    lastVersion = key;
+                }
             }
+            dbTool.updateVersion(lastVersion);
         }
-        dbTool.updateVersion(lastVersion);
         if(connection != null){
             connection.close();
         }
@@ -71,50 +73,45 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
      * @author longxw
      * @since 2019-8-12
      */
-    private Map<String,String> getScript(String version) {
-        try {
-            URL url = ResourceUtils.getURL(defaultPath);
-            if(ResourceUtils.isJarURL(url)){
-                Enumeration<JarEntry> entries = ((JarURLConnection) url.openConnection()).getJarFile().entries();
-                if(entries != null){
-                    String sqlPath = defaultPath.split(":")[0];
-                    List<String> list = new ArrayList<>();
-                    while (entries.hasMoreElements()){
-                        JarEntry entry = entries.nextElement();
-                        if(entry.getName().startsWith(sqlPath)){
-                            int index = entry.getName().lastIndexOf(".sql");
-                            if(index>0){
-                                list.add(entry.getName());
-                            }
+    private Map<String,String> getScript(String version) throws IOException{
+        URL url = ResourceUtils.getURL(defaultPath);
+        if(ResourceUtils.isJarURL(url)){
+            Enumeration<JarEntry> entries = ((JarURLConnection) url.openConnection()).getJarFile().entries();
+            if(entries != null){
+                String sqlPath = defaultPath.split(":")[0];
+                List<String> list = new ArrayList<>();
+                while (entries.hasMoreElements()){
+                    JarEntry entry = entries.nextElement();
+                    if(entry.getName().startsWith(sqlPath)){
+                        int index = entry.getName().lastIndexOf(".sql");
+                        if(index>0){
+                            list.add(entry.getName());
                         }
                     }
                 }
             }
-            File sqlDir = new File(url.getPath()).getCanonicalFile();
-            File[] files = sqlDir.listFiles();
-            List<File> fileList = Arrays.stream(files)
-                    .filter(file -> compareVersion(file.getName(),version)>0 )
-                    .collect(Collectors.toList());
-            Map<String,String> map = new TreeMap();
-            fileList.forEach( file -> {
-                StringBuffer sb =new StringBuffer();
-                try{
-                    FileTool.readLines(file).forEach(line -> {
-                        if( !line.startsWith("#")){
-                            sb.append(line);
-                        }
-                    });
-                    map.put(file.getName(),sb.toString());
-                }catch (IOException e){
-                    e.printStackTrace();
-                }
-
-            });
-            return map;
-        }catch (Exception e){
-            e.printStackTrace();
-            return new TreeMap();
         }
+        File sqlDir = new File(url.getPath()).getCanonicalFile();
+        File[] files = sqlDir.listFiles();
+        List<File> fileList = Arrays.stream(files)
+                .filter(file -> compareVersion(file.getName(),version)>0 )
+                .collect(Collectors.toList());
+        Map<String,String> map = new TreeMap();
+        fileList.forEach( file -> {
+            StringBuffer sb =new StringBuffer();
+            try{
+                FileTool.readLines(file).forEach(line -> {
+                    if( !line.startsWith("#")){
+                        sb.append(line);
+                    }
+                });
+                map.put(file.getName(),sb.toString());
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+
+        });
+        return map;
     }
 
     private Connection getConnection(ApplicationContext applicationContext) throws SQLException{
