@@ -34,7 +34,9 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
     public void onApplicationEvent(ContextRefreshedEvent event) {
         ApplicationContext applicationContext = event.getApplicationContext();
         try {
-            doUpdater(applicationContext);
+            if(applicationContext.getParent() == null){
+                doUpdater(applicationContext);
+            }
         }catch (Exception e){
             e.printStackTrace();
         }
