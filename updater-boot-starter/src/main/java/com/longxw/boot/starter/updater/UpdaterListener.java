@@ -51,16 +51,20 @@ public class UpdaterListener implements ApplicationListener<ContextRefreshedEven
 
         Map<String,String> map = getScript(version);
         if(!map.isEmpty()){
-            String lastVersion = null;
             for(String key : map.keySet()){
                 String[] sqls = map.get(key).trim().split(";");
-                for(String sql : sqls){
-                    log.info("executor sql:{},version:{}",sql,key);
-                    dbTool.executeUpdate(sql);
-                    lastVersion = key;
+                try {
+                    dbTool.setAutoCommit(false);
+                    for(String sql : sqls){
+                        log.info("executor sql:{},version:{}",sql,key);
+                        dbTool.executeUpdate(sql);
+                    }
+                    dbTool.updateVersion(key);
+                    dbTool.commit();
+                }catch (SQLException e){
+                    dbTool.rollback();
                 }
             }
-            dbTool.updateVersion(lastVersion);
         }
         if(connection != null){
             connection.close();

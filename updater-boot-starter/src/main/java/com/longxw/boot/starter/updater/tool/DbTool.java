@@ -90,4 +90,17 @@ public class DbTool {
         this.executeUpdate(delql);
         this.insertVersion(version);
     }
+
+    public void setAutoCommit(boolean autoCommit) throws SQLException{
+        this.connection.setAutoCommit(autoCommit);
+    }
+    public void commit() throws SQLException{
+        this.connection.commit();
+    }
+    public void rollback() throws SQLException{
+        this.connection.rollback();
+    }
+    public void rollback(Savepoint savepoint) throws SQLException{
+        this.connection.rollback(savepoint);
+    }
 }
