@@ -19,7 +19,10 @@ public class UpdaterDataSourceProperties {
 
     private String skip;
 
-    private boolean updater = false; //配置为true才会
+    /**
+     * 配置为 true 才会使用此数据源获取连接
+     */
+    private boolean updater = false;
 
     @Override
     public String toString(){
